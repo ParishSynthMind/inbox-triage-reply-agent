@@ -18,6 +18,9 @@ This is a trimmed, generic version of a production triage loop - the
 original plugs into a specific mailbox and a specific assistant persona;
 this version keeps the pattern (poll -> filter by trust -> generate with
 memory -> reply -> log) without any of that specific configuration.
+
+AI disclosure (EU AI Act Art. 50): every auto-sent reply ends with the line
+from AI_DISCLOSURE (see disclosure.py).
 """
 import json
 import os
@@ -27,7 +30,7 @@ from datetime import datetime, timezone
 from email.utils import parseaddr
 from pathlib import Path
 
-from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+from disclosure import with_disclosure
 
 HERE = Path(__file__).parent
 SESSION_FILE = HERE / ".reply_session_id"
@@ -87,6 +90,8 @@ def fetch_messages():
 
 
 async def generate_reply(message: str) -> str:
+    from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient  # lazy: tests need no SDK
+
     resume_id = SESSION_FILE.read_text().strip() if SESSION_FILE.exists() else None
     resume_id = resume_id or None
 
@@ -158,6 +163,7 @@ def main():
             log(f"ERROR generating reply to '{subject}': {e}")
             continue
 
+        reply = with_disclosure(reply)
         reply_subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
         proc = subprocess.run(
             ["python3", str(SEND_EMAIL), sender, reply_subject, "-"],
